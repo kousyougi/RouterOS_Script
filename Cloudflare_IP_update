@@ -1,0 +1,44 @@
+# Check Cloudflare IPs and Update address-list
+
+/tool fetch url="https://www.cloudflare.com/ips-v4" mode=https dst-path=new_cf_ipv4
+:delay 3s
+
+:local newsize [/file get [/file find name=new_cf_ipv4] size]
+:local oldsize [/file get [/file find name=cf_ipv4] size]
+
+:if ( $newsize != $oldsize ) do={
+
+
+:if ( [/file get [/file find name=new_cf_ipv4] size] > 0 ) do={
+	# Remove exisiting addresses from the current Address list
+	/ip firewall address-list remove [/ip firewall address-list find list=Cloudflare]
+
+	:local content [/file get [/file find name=new_cf_ipv4] contents] ;
+	:local contentLen [ :len $content ] ;
+	:local contentLenEnd ( $contentLen - 6 )
+  
+	:local lineEnd 0;
+	:local entry "";
+	:local lastEnd 0;
+
+	:do {
+		:set lineEnd [:find $content "\n" $lastEnd ] ;
+		:set entry [:pick $content $lastEnd $lineEnd] ;
+		:set lastEnd ( $lineEnd + 1 ) ;
+		:if ( [:len $entry ] > 6 ) do={
+			/ip firewall address-list add list=Cloudflare address=$entry
+		}
+	} while=( $lineEnd < $contentLenEnd )
+
+/tool fetch url="https://www.cloudflare.com/ips-v4" mode=https dst-path=cf_ipv4
+:delay 3s
+
+}
+
+
+}
+
+:delay 3s
+/file remove [find name="new_cf_ipv4"]
+
+
